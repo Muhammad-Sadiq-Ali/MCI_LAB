@@ -3,13 +3,13 @@ import matplotlib.pyplot as plt
 from drawnow import *
 
 # === Setup Serial ===
-sinWaveData = serial.Serial('/dev/ttyACM0', 115200)
+sinWaveData = serial.Serial('/dev/ttyUSB0', 115200)
 plt.ion()  # Enable interactive mode
 
 adcValues = []
 filteredValues = []
 time_ms = []
-cnt = 0  # Time index (1 ms steps)
+cnt = 0  # Time index (1 ms stepplot/s)
 
 # === Plotting Function ===
 def makeFig():

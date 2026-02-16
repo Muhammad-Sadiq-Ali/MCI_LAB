@@ -49,9 +49,14 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user defined include paths
+    Core/Inc
+    Drivers/STM32F3xx_HAL_Driver/Inc
+    Drivers/CMSIS/Device/ST/STM32F3xx/Include
+    Drivers/CMSIS/Include
+    # Add this line for DSP:
+    Drivers/CMSIS/DSP/Include
 )
-
+add_definitions(-DARM_MATH_CM4)
 # Add project symbols (macros)
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined symbols
