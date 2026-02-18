@@ -9,7 +9,7 @@ plt.ion()  # Enable interactive mode
 adcValues = []
 filteredValues = []
 time_ms = []
-cnt = 0  # Time index (1 ms stepplot/s)
+cnt = 0  # Time index (1 ms steps)
 
 # === Plotting Function ===
 def makeFig():

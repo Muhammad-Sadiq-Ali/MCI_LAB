@@ -26,6 +26,7 @@
 #include <sys/types.h>
 #include <string.h>
 #include "stm32f3xx_hal.h"
+#include "stm32f3xx_hal_adc.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -86,6 +87,9 @@ float32_t inputBuffer[FILTER_LEN] = {0};
 float32_t filteredOutput = 0.0f;
 uint8_t bufferIndex = 0;
 char uartBuffer[100];
+char output[50];         
+uint32_t adcValue = 0; 
+
 /* USER CODE END 0 */
 
 /**
@@ -124,29 +128,19 @@ int main(void)
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
-  /* USER CODE END 2 */
-
+  /* USER CODE END 2 */         
+  HAL_ADC_Start_IT(&hadc1, &adcValue, 1); // Start ADC in interrupt mode
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
-{
-    // Start ADC conversion
-    HAL_ADC_Start(&hadc1);
-    
-    HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
-    
+  { 
+    // TASK 02(a)
     // Read ADC value
-    uint32_t adcValue = HAL_ADC_GetValue(&hadc1);
-    HAL_ADC_Stop(&hadc1);
-    float32_t voltage = (adcValue / ADC_RESOLUTION) * VREF;
-    
-    // Apply moving average filter
-    apply_moving_average(voltage);
-    
-    myPrintf("ADC Value: %lu\n\r", adcValue);
-    myPrintf("Voltage: %lu\n\r", voltage);
-    
-    HAL_Delay(10);
+    /* adcValue = HAL_ADC_GetValue(&hadc1);
+    apply_moving_average((float32_t)adcValue);
+    sprintf(output, "%lu,%lu\r\n", (uint32_t)adcValue, (uint32_t)filteredOutput);
+    HAL_UART_Transmit(&huart2, (uint8_t*)output, strlen(output), 100);
+    HAL_Delay(1); */
 }
   /* USER CODE END 3 */
 }
@@ -156,7 +150,15 @@ void apply_moving_average(float32_t new_sample){
     bufferIndex = (bufferIndex + 1) % FILTER_LEN;
     arm_mean_f32(inputBuffer, FILTER_LEN, &filteredOutput);
 }
-
+//TASK 02(b)
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
+  if (hadc -> Instance == ADC1) {
+    adcValue = HAL_ADC_GetValue(hadc);
+    apply_moving_average((float32_t)adcValue);
+    sprintf(output, "%lu,%lu\r\n", (uint32_t)adcValue, (uint32_t)filteredOutput);
+    HAL_UART_Transmit(&huart2, (uint8_t*)output, strlen(output), 100);
+  }
+}
 /**
   * @brief System Clock Configuration
   * @retval None
@@ -477,20 +479,7 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void myPrintf(const char *fmt, ...)
-{
-  uint32_t Delay = 100;
-  // TODO: Step 1 - Declare and initialize a character buffer .
-  char buffer[100];
-  va_list args;
-  va_start(args, fmt);
-  // TODO: Step 3 - Format the final string using vsnprintf .
-  vsnprintf(buffer, sizeof(buffer), fmt, args);
-  va_end(args);
-  // TODO: Step 4 - Transmit the string over UART using HAL_UART_Transmit .
-  HAL_UART_Transmit(&huart2, (uint8_t *)buffer, strlen(buffer), HAL_MAX_DELAY);
-  HAL_Delay(Delay);
-}
+
 /* USER CODE END 4 */
 
 /**
