@@ -110,8 +110,6 @@ int main(void)
     __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2 , ARR - 100);
   }
   void backward_motor(){
-    // HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
-    // HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
     HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(GPIOD, GPIO_PIN_5, GPIO_PIN_SET);
     HAL_GPIO_WritePin(GPIOD, GPIO_PIN_1, GPIO_PIN_SET);
