@@ -18,6 +18,9 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -76,14 +79,14 @@ void forward_motor(){
     HAL_GPIO_WritePin(GPIOD, GPIO_PIN_5, GPIO_PIN_RESET);
 
     uint32_t ARR = 999;
-    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1 , ARR - 100);
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1 , ARR);
   }
   void backward_motor(){
     HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(GPIOD, GPIO_PIN_5, GPIO_PIN_SET);
 
     uint32_t ARR = 999;
-    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1 , ARR - 100);
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1 , ARR);
   }
 /* USER CODE END 0 */
 
@@ -133,31 +136,33 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-      // --- wait for first falling edge ---
-      while (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5) == GPIO_PIN_RESET);  // wait high
-      while (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5) == GPIO_PIN_SET);    // wait falling
+      // First Falling Edge
+      while (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_4) == GPIO_PIN_RESET);  // wait high
+      while (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_4) == GPIO_PIN_SET);    // wait falling
+      
       uint32_t t1 = __HAL_TIM_GET_COUNTER(&htim2);
 
-      // --- wait for second falling edge ---
-      while (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5) == GPIO_PIN_RESET);  // wait high
-      while (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5) == GPIO_PIN_SET);    // wait falling
+      // Second Falling Edge
+      while (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_4) == GPIO_PIN_RESET);  // wait high
+      while (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_4) == GPIO_PIN_SET);    // wait falling
       uint32_t t2 = __HAL_TIM_GET_COUNTER(&htim2);
 
-      // --- handle overflow ---
+      // overflow handling
       uint32_t ticks = (t2 >= t1) ? (t2 - t1) : (0xFFFFFFFF - t1 + t2 + 1);
 
       if (ticks == 0) continue;
-
-      // --- calculate ---
-      float freq = 1000000.0f / (float)ticks;   // ticks are in microseconds
+      float PPR = 330.0f; // Pulses Per Revolution
+      float freq = 666666.0f / (float)ticks;
       float rpm  = (60.0f * freq) / PPR;
-
+      char buf[50];
       int len = snprintf(buf, sizeof(buf), "Freq: %.2f Hz | RPM: %.2f\r\n", freq, rpm);
       HAL_UART_Transmit(&huart2, (uint8_t*)buf, len, HAL_MAX_DELAY);
   }
-/* USER CODE END WHILE */
+    /* USER CODE END WHILE */
+
+    /* USER CODE BEGIN 3 */
+  }
   /* USER CODE END 3 */
-}
 
 /**
   * @brief System Clock Configuration
@@ -504,8 +509,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PA0 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  /*Configure GPIO pins : PA0 PA4 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_4;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
