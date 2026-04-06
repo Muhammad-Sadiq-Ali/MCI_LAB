@@ -91,17 +91,15 @@ void forward_motor(){
 
 
 volatile int interrupt_count = 0;
-volatile uint32_t arr[20];
+volatile uint32_t arr[21];
 volatile int print = 0;
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
     if (htim->Instance == TIM2){
         uint32_t captured = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1);
         interrupt_count++;
-
         if (interrupt_count == 1){
             __HAL_TIM_SET_COUNTER(&htim2, 0);
         }
-
         if ((interrupt_count > 1) && (interrupt_count < 22)){
             arr[interrupt_count - 2] = captured;
             __HAL_TIM_SET_COUNTER(&htim2, 0);
@@ -162,24 +160,24 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    /* USER CODE END WHILE */
-    uint32_t sum = 0;
-    
-    if (print == 1){
-        uint32_t ticks = arr[0];
-        float avg = (float)sum / 20.0f;
+      if (print == 1)
+      {
+          print = 0;  // reset FIRST before anything else
 
-        float PPR = 330.0f; // Pulses Per Revolution
-        float freq = 1000000.0f / (float)ticks;
-        float rpm  = (60.0f * freq) / PPR;
+          uint32_t sum = 0;
+          for (int i = 0; i < 20; i++) sum += arr[i];  // 20 not 21
+          float ticks = (float)sum / 20.0f;
 
-        char buf[50];
-        int len = snprintf(buf, sizeof(buf), "Freq: %.2f Hz | RPM: %.2f\r\n", freq, rpm);
-        HAL_UART_Transmit(&huart2, (uint8_t*)buf, len, HAL_MAX_DELAY);
+          if (ticks > 0)
+          {
+              float freq = 666666.0f / ticks;
+              float rpm  = (60.0f * freq) / 330.0f;
 
-        print = 0;
-    }
-    /* USER CODE BEGIN 3 */
+              char buf[64];
+              int len = snprintf(buf, sizeof(buf), "Freq: %.2f Hz | RPM: %.2f\r\n", freq, rpm);
+              HAL_UART_Transmit(&huart2, (uint8_t*)buf, len, 100);
+          }
+      }
   }
   /* USER CODE END 3 */
 }
