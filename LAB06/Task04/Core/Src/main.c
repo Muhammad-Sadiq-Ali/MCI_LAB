@@ -162,10 +162,10 @@ int main(void)
   {
       if (print == 1)
       {
-          print = 0;  // reset FIRST before anything else
+          print = 0;  // reset
 
           uint32_t sum = 0;
-          for (int i = 0; i < 20; i++) sum += arr[i];  // 20 not 21
+          for (int i = 0; i < 20; i++) sum += arr[i];  // 20 samples
           float ticks = (float)sum / 20.0f;
 
           if (ticks > 0)
