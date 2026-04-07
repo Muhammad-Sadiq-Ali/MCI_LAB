@@ -18,6 +18,9 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "string.h"
+#include "stdio.h"
+#include "math.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -65,7 +68,137 @@ static void MX_USB_PCD_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+#define DevAddress 0x19 << 1
+#define OUT_X_L  0x28
+# define CTRL_REG1 0x20
+# define CTRL_REG1_VAL 0b10001111
 
+// Variables to store raw and processed sensor data
+float acceleration_x, acceleration_tilt_x, acceleration_y, acceleration_tilt_y, acceleration_z, acceleration_tilt_z;
+int16_t gyro_x, gyro_y, gyro_z;
+float acc_offset_x = 0, acc_offset_y = 0, acc_offset_z = 0;
+int16_t gyro_offset_x = 0, gyro_offset_y = 0, gyro_offset_z = 0;
+float angle_x = 0, angle_y = 0, angle_z = 0;
+
+// Gyro initialization function
+void gyro_init ()
+{
+  uint8_t tx [2] = {CTRL_REG1 , CTRL_REG1_VAL};
+  HAL_GPIO_WritePin (GPIOE , GPIO_PIN_3 , GPIO_PIN_RESET);
+  HAL_SPI_Transmit (& hspi1 , tx , 2, HAL_MAX_DELAY);
+  HAL_GPIO_WritePin (GPIOE , GPIO_PIN_3 , GPIO_PIN_SET);
+}
+
+// Reading gyro data for all axis
+void gyro_read_all(int16_t *x, int16_t *y, int16_t *z)
+{
+    uint8_t tx = OUT_X_L | 0x80 | 0x40;  // read bit + auto-increment bit
+    uint8_t rx[6] = {0};
+
+    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_3, GPIO_PIN_RESET);  // CS LOW once
+    HAL_SPI_Transmit(&hspi1, &tx, 1, HAL_MAX_DELAY);       // send start register
+    HAL_SPI_Receive(&hspi1, rx, 6, HAL_MAX_DELAY);         // read all 6 bytes
+    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_3, GPIO_PIN_SET);    // CS HIGH once
+
+    *x = (int16_t)((rx[1] << 8) | rx[0]);  // XH | XL
+    *y = (int16_t)((rx[3] << 8) | rx[2]);  // YH | YL
+    *z = (int16_t)((rx[5] << 8) | rx[4]);  // ZH | ZL
+}
+
+// Reading accelerometer data for all axis
+#define CTRL_REG1_A 0x20
+#define CTRL_REG4_A 0x23
+void Init_LSM()
+{
+  uint8_t write_reg_1 = 0x67;
+  uint8_t write_reg_4 = 0x00;
+  HAL_I2C_Mem_Write(&hi2c1, DevAddress, CTRL_REG1_A, I2C_MEMADD_SIZE_8BIT, &write_reg_1, sizeof(write_reg_1), 100);
+  HAL_I2C_Mem_Write(&hi2c1, DevAddress, CTRL_REG4_A, I2C_MEMADD_SIZE_8BIT, &write_reg_4, sizeof(write_reg_4), 100);
+}
+
+void Read_LSM()
+{
+  uint8_t low;
+  uint8_t high;
+
+  // Read raw X-axis acceleration data
+  HAL_I2C_Mem_Read(&hi2c1, DevAddress, 0x28, I2C_MEMADD_SIZE_8BIT, &low, sizeof(low), 100);
+  HAL_I2C_Mem_Read(&hi2c1, DevAddress, 0x29, I2C_MEMADD_SIZE_8BIT, &high, sizeof(high), 100);
+  int16_t raw_x = (high << 8) | low;
+
+  // Read raw Y-axis acceleration data
+  HAL_I2C_Mem_Read(&hi2c1, DevAddress, 0x2A | 0x80, I2C_MEMADD_SIZE_8BIT, &low, 1, HAL_MAX_DELAY);
+  HAL_I2C_Mem_Read(&hi2c1, DevAddress, 0x2B | 0x80, I2C_MEMADD_SIZE_8BIT, &high, 1, HAL_MAX_DELAY);
+  int16_t raw_y = (int16_t)((high << 8) | low);
+  
+  // Read raw Z-axis acceleration data
+  HAL_I2C_Mem_Read(&hi2c1, DevAddress, 0x2C | 0x80, I2C_MEMADD_SIZE_8BIT, &low, 1, HAL_MAX_DELAY);
+  HAL_I2C_Mem_Read(&hi2c1, DevAddress, 0x2D | 0x80, I2C_MEMADD_SIZE_8BIT, &high, 1, HAL_MAX_DELAY);
+  int16_t raw_z = (int16_t)((high << 8) | low);
+
+  // Convert raw data to acceleration in g's and tilt in degrees
+  acceleration_x = (raw_x * 3.9) / 1000;
+  acceleration_x -= acc_offset_x;
+  acceleration_tilt_x = acceleration_x * 57.2958;
+  
+  acceleration_y = (raw_y * 3.9) / 1000;
+  acceleration_y -= acc_offset_y;
+  acceleration_tilt_y = acceleration_y * 57.2958;
+  
+  acceleration_z = (raw_z * 3.9) / 1000;
+  acceleration_z -= acc_offset_z;
+  acceleration_tilt_z = acceleration_z * 57.2958;
+  
+}
+void Print_LSM()
+{
+  char buffer[128];
+  float gyro_x_dps = gyro_x * 0.00875f;
+  float gyro_y_dps = gyro_y * 0.00875f;
+  float gyro_z_dps = gyro_z * 0.00875f;
+  sprintf(buffer, "%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\r\n", gyro_x_dps, acceleration_x, gyro_y_dps, acceleration_y, gyro_z_dps, acceleration_z);
+  HAL_UART_Transmit(&huart2, (uint8_t*)buffer, strlen(buffer), HAL_MAX_DELAY);
+}
+void offset_LSM()
+{
+  for (int i = 0; i < 20; i++)
+  {
+    Read_LSM();
+    gyro_read_all(&gyro_x, &gyro_y, &gyro_z);
+    acc_offset_x += acceleration_x;
+    gyro_offset_x += gyro_x;
+    acc_offset_y += acceleration_y;
+    gyro_offset_y += gyro_y;
+    acc_offset_z += acceleration_z;
+    gyro_offset_z += gyro_z;
+    HAL_Delay(10);
+  }
+  gyro_offset_x /= 20;
+  acc_offset_x /= 20;
+  gyro_offset_y /= 20;
+  acc_offset_y /= 20;
+  gyro_offset_z /= 20;
+  acc_offset_z /= 20;
+}
+
+void angle_calculation(){
+  // Complementary filter parameters
+  float alpha = 0.98; // Filter coefficient
+  float dt = 0.3; // Time step (300 ms)
+  // Gyro_dps
+  float gyro_x_dps = gyro_x * 0.00875f;
+  float gyro_y_dps = gyro_y * 0.00875f;
+  float gyro_z_dps = gyro_z * 0.00875f; 
+  // Calculate angles from complementary filter
+  angle_x = alpha * (0 + (gyro_x_dps) * dt) + (1 - alpha) * (-acceleration_tilt_x);
+  angle_y = alpha * (0 + gyro_y_dps * dt) + (1 - alpha) * acceleration_tilt_y;
+  angle_z = alpha * (0 + gyro_z_dps * dt) + (1 - alpha) * acceleration_tilt_z;
+}
+void print_angle(){
+  char buffer[128];
+  sprintf(buffer, "%.2f,%.2f,%.2f\r\n", angle_x, angle_y, angle_z);
+  HAL_UART_Transmit(&huart2, (uint8_t*)buffer, strlen(buffer), HAL_MAX_DELAY);
+}
 /* USER CODE END 0 */
 
 /**
@@ -75,14 +208,13 @@ static void MX_USB_PCD_Init(void);
 int main(void)
 {
 
-  /* USER CODE BEGIN 1 */
+/* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
 
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */  HAL_Init();
 
   /* USER CODE BEGIN Init */
 
@@ -102,7 +234,11 @@ int main(void)
   MX_USART2_UART_Init();
   MX_USB_PCD_Init();
   /* USER CODE BEGIN 2 */
-
+  Init_LSM();
+  HAL_Delay(100);
+  gyro_init();
+  HAL_Delay(100);
+  offset_LSM();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -110,7 +246,14 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-
+    Read_LSM();
+    HAL_Delay(100);
+    gyro_read_all(&gyro_x, &gyro_y, &gyro_z);
+    HAL_Delay(100);
+    angle_calculation();
+    HAL_Delay(100);
+    print_angle();
+    // Print_LSM();
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
@@ -233,7 +376,7 @@ static void MX_SPI1_Init(void)
   hspi1.Instance = SPI1;
   hspi1.Init.Mode = SPI_MODE_MASTER;
   hspi1.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi1.Init.DataSize = SPI_DATASIZE_4BIT;
+  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
   hspi1.Init.CLKPolarity = SPI_POLARITY_HIGH;
   hspi1.Init.CLKPhase = SPI_PHASE_2EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
