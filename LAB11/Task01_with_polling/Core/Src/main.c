@@ -217,6 +217,14 @@ void print_angle(){
   sprintf(buffer, "%.2f,%.2f,%.2f\r\n", angle_x, angle_y, angle_z);
   HAL_UART_Transmit(&huart2, (uint8_t*)buffer, strlen(buffer), HAL_MAX_DELAY);
 }
+
+void plot_print(){
+  char buffer[128];
+  float gyro_y_dps = gyro_y * 0.00875f;
+  sprintf(buffer, "%.2f,%.2f,%.2f\r\n", acceleration_tilt_y, gyro_y_dps, angle_y);
+  HAL_UART_Transmit(&huart2, (uint8_t*)buffer, strlen(buffer), HAL_MAX_DELAY);
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -270,8 +278,8 @@ int main(void)
     HAL_Delay(100);
     angle_calculation();
     HAL_Delay(100);
-    print_angle();
-    // Print_LSM();
+    // Plot
+    plot_print();
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
