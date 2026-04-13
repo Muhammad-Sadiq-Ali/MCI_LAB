@@ -299,7 +299,7 @@ int main(void)
   gyro_init();
   HAL_Delay(100);
   offset_LSM();
-  PID_Init(&pid, 1.0f, 0.0f, 0.0f, dt, -1000, 1000, 0.1f);
+  PID_Init(&pid, 1.0f, 0.0001f, 0.05f, dt, -1000, 1000, 0.1f);
   configure_timer_interrupt(100);  // set to 100Hz
   HAL_TIM_Base_Start_IT(&htim2);
   /* USER CODE END 2 */
